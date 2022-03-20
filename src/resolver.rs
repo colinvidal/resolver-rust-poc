@@ -60,7 +60,6 @@ fn get_ns(response: &Packet) -> Option<String> {
 
 
 // TODO other ideas:
-// - put all of this in a lib.rs
 // - add a server functionallity in a lib.rs (then kick it off depending of stdargs when starting the app)
 // - then make udp server multithreaded (async?)
 // - then add other types support (CNAME, AAAA, MX, etc.)
