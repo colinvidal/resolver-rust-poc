@@ -5,6 +5,8 @@ use std::error::Error;
 use std::net::UdpSocket;
 use std::process;
 
+use std::net::{IpAddr, Ipv4Addr};
+
 use dns_parser::rdata;
 use dns_parser::{Builder, Packet, RData, ResponseCode};
 use dns_parser::{QueryClass, QueryType};
@@ -23,9 +25,9 @@ fn main() {
     process::exit(code);
 }
 
-fn query_server<'a>(server_addr: &str, name: &str, response_buf: &'a mut Vec<u8>) -> Result<Packet<'a>, Box<dyn Error>> {
+fn query_server<'a>(server_addr: &IpAddr, name: &str, response_buf: &'a mut Vec<u8>) -> Result<Packet<'a>, Box<dyn Error>> {
     let sock = UdpSocket::bind("0.0.0.0:0")?;
-    sock.connect(server_addr.to_owned() + ":53")?;
+    sock.connect(server_addr.to_string() + ":53")?;
 
     let mut query = Builder::new_query(1, true);
     query.add_question(name, false, QueryType::A, QueryClass::IN);
@@ -36,12 +38,12 @@ fn query_server<'a>(server_addr: &str, name: &str, response_buf: &'a mut Vec<u8>
     Ok(Packet::parse(response_buf)?)
 }
 
-fn get_answer(response: &Packet) -> Option<String> {
+fn get_answer(response: &Packet) -> Option<IpAddr> {
     if response.answers.len() > 0 {
         for ans in &response.answers {
             match ans.data {
                 RData::A(rdata::a::Record(ip)) => {
-                    return Some(ip.to_string())
+                    return Some(IpAddr::V4(ip))
                 }
                 _ => return None
             }
@@ -50,11 +52,11 @@ fn get_answer(response: &Packet) -> Option<String> {
     None
 }
 
-fn get_additional(response: &Packet) -> Option<String> {
+fn get_additional(response: &Packet) -> Option<IpAddr> {
     if response.additional.len() > 0 {
         for glue in &response.additional {
             if let RData::A(rdata::a::Record(ip)) = glue.data {
-                return Some(ip.to_string())
+                return Some(IpAddr::V4(ip))
             }
         }
     }
@@ -74,15 +76,14 @@ fn get_ns(response: &Packet) -> Option<String> {
 
 
 // TODO other ideas:
-// - keep real types on those helper function (i.e. Ipv4Addr, etc.). Probably need an Enum{ IPv4(ip), IPv6(ip), Name(String), etc.}
 // - put all of this in a lib.rs
 // - add a server functionallity in a lib.rs (then kick it off depending of stdargs when starting the app)
 // - then make udp server multithreaded (async?)
 // - then add other types support (CNAME, AAAA, MX, etc.)
 // - then introduce some multi request logic (ask to several root server, keep a map on the faster ones to answer)
 
-fn resolve(name: &str, debug_indent: u8) -> Result<String, Box<dyn Error>> {
-    let mut server_ip = "198.41.0.4".to_string();
+fn resolve(name: &str, debug_indent: u8) -> Result<IpAddr, Box<dyn Error>> {
+    let mut server_ip = IpAddr::V4(Ipv4Addr::new(198, 41, 0, 4));
     let mut response_buf = vec![0u8; 4096];
     let indent: String = (0..debug_indent*2).into_iter().map(|_| ' ').collect();
     
@@ -107,6 +108,7 @@ fn resolve(name: &str, debug_indent: u8) -> Result<String, Box<dyn Error>> {
             break;
         }
 
+        // So we don't reallocate a buffer at each iteration - but we need to clear it to avoid confusing parser code
         response_buf.clear();
         response_buf.resize(4096, 0);
     }
