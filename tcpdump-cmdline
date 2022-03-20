@@ -1,0 +1,2 @@
+ sudo tcpdump -n 'udp port 53'
+
