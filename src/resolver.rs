@@ -9,7 +9,11 @@ use dns_parser::rdata;
 use dns_parser::{Builder, Packet, RData, ResponseCode};
 use dns_parser::{QueryClass, QueryType};
 
-fn query_server<'a>(server_addr: &IpAddr, name: &str, response_buf: &'a mut Vec<u8>) -> Result<Packet<'a>, Box<dyn Error>> {
+fn query_server<'a>(
+    server_addr: &IpAddr,
+    name: &str,
+    response_buf: &'a mut Vec<u8>,
+) -> Result<Packet<'a>, Box<dyn Error>> {
     let sock = UdpSocket::bind("0.0.0.0:0")?;
     sock.connect(server_addr.to_string() + ":53")?;
 
@@ -26,10 +30,8 @@ fn get_answer(response: &Packet) -> Option<IpAddr> {
     if response.answers.len() > 0 {
         for ans in &response.answers {
             match ans.data {
-                RData::A(rdata::a::Record(ip)) => {
-                    return Some(IpAddr::V4(ip))
-                }
-                _ => return None
+                RData::A(rdata::a::Record(ip)) => return Some(IpAddr::V4(ip)),
+                _ => return None,
             }
         }
     }
@@ -40,7 +42,7 @@ fn get_additional(response: &Packet) -> Option<IpAddr> {
     if response.additional.len() > 0 {
         for glue in &response.additional {
             if let RData::A(rdata::a::Record(ip)) = glue.data {
-                return Some(IpAddr::V4(ip))
+                return Some(IpAddr::V4(ip));
             }
         }
     }
@@ -51,13 +53,12 @@ fn get_ns(response: &Packet) -> Option<String> {
     if response.nameservers.len() > 0 {
         for ns in &response.nameservers {
             if let RData::NS(rdata::ns::Record(name)) = ns.data {
-                return Some(name.to_string())
+                return Some(name.to_string());
             }
         }
     }
     None
 }
-
 
 // TODO other ideas:
 // - add a server functionallity in a lib.rs (then kick it off depending of stdargs when starting the app)
@@ -68,8 +69,8 @@ fn get_ns(response: &Packet) -> Option<String> {
 pub fn resolve(name: &str, debug_indent: u8) -> Result<IpAddr, Box<dyn Error>> {
     let mut server_ip = IpAddr::V4(Ipv4Addr::new(198, 41, 0, 4));
     let mut response_buf = vec![0u8; 4096];
-    let indent: String = (0..debug_indent*2).into_iter().map(|_| ' ').collect();
-    
+    let indent: String = (0..debug_indent * 2).into_iter().map(|_| ' ').collect();
+
     loop {
         println!("{}resolving {}@{}", indent, name, server_ip);
         let response = query_server(&server_ip, name, &mut response_buf)?;
@@ -80,7 +81,7 @@ pub fn resolve(name: &str, debug_indent: u8) -> Result<IpAddr, Box<dyn Error>> {
 
         if let Some(ip) = get_answer(&response) {
             println!("{} -> {} resolved into {}", indent, name, ip);
-            return Ok(ip)
+            return Ok(ip);
         } else if let Some(additional) = get_additional(&response) {
             println!("{} -> ask to ip {}", indent, additional);
             server_ip = additional
